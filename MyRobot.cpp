@@ -101,7 +101,7 @@ public:
 		mycam.WriteResolution(AxisCamera::kResolution_640x480);
 		mycam.WriteCompression(20);
 		mycam.WriteBrightness(25);
-		Wait(3.0);
+		
          
 		dsLCD = DriverStationLCD::GetInstance();
 		dsLCD->Clear();
