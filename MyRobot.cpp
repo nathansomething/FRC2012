@@ -16,8 +16,8 @@ class RobotDemo : public SimpleRobot
 	Jaguar *LeftDriveJaguar;
 	Jaguar *RightDriveJaguar;
 	Watchdog *Saftey;
-	Joystick *LeftDrive;
-	Joystick *RightDrive;
+	Joystick *LeftDriveJoystick;
+	Joystick *RightDriveJoystick;
 	DriverStationLCD *dsLCD;
 	DriverStation *ds;
 	DriverStationEnhancedIO *dsIO;
@@ -35,8 +35,8 @@ public:
 		LeftDriveJaguar = new Jaguar(6);
 		RightDriveJaguar = new Jaguar(7);
 		Saftey = new Watchdog;
-		LeftDrive = new Joystick(1);
-		RightDrive = new Joystick(2);
+		LeftDriveJoystick = new Joystick(1);
+		RightDriveJoystick = new Joystick(2);
 		//dsIO = new DriverStationEnhancedIO;
 		//dsLCD = new DriverStationLCD;
 		//myRobot->SetExpiration(0.1);
@@ -53,7 +53,7 @@ public:
 		dsLCD->Clear();
 		//dsLCD->Printf(DriverStationLCD::kUser_Line1, 1, "Hello World" );
 		//dsLCD->UpdateLCD();
-		
+		AutonomousDrive(1.0,0.0);
 		Wait(0.5);
 		
 		ds = DriverStation::GetInstance();
@@ -84,9 +84,6 @@ public:
 		delete ds;
 	}
 
-	/**
-	 * Runs the motors with arcade steering. 
-	 */
 	void OperatorControl(void)
 	{
 		HSLImage *Himage;
@@ -94,21 +91,20 @@ public:
 		BinaryImage *matchingPixels;
 		vector<ParticleAnalysisReport> *pReport;
 		
-		//myRobot->SetSafetyEnabled(true);
-		Saftey->SetEnabled(false);
+		Saftey->SetEnabled(true);
 		AxisCamera &mycam = AxisCamera::GetInstance("10.15.10.11");
 		
 		mycam.WriteResolution(AxisCamera::kResolution_640x480);
 		mycam.WriteCompression(20);
 		mycam.WriteBrightness(25);
 		
-         
 		dsLCD = DriverStationLCD::GetInstance();
 		dsLCD->Clear();
 		
 		while(IsOperatorControl())
 		{
-			UpdateDrive();
+			Saftey->Feed();
+			UpdateStickDrive();
 			Wait(0.005);
 			if (mycam.IsFreshImage())
 				{
@@ -129,12 +125,30 @@ public:
 		}	
 	}
 	
-	void UpdateDrive() //Gets the value of the left and right joystick and sets it to the power of the left and right jaguars
+	void UpdateStickDrive() //Gets the value of the left and right joystick and sets it to the power of the left and right jaguars
 	{	
-		LeftDriveJaguar->Set(LeftDrive->GetY());
-		RightDriveJaguar->Set(RightDrive->GetY());
+		LeftDriveJaguar->Set(LeftDriveJoystick->GetY());
+		RightDriveJaguar->Set(-RightDriveJoystick->GetY());
 	}
 	
+	void AutonomousDrive(float Speed, float Curve)
+	{
+		if (Curve > 0) //turn right
+		{
+			LeftDriveJaguar->Set(Speed);
+			RightDriveJaguar->Set(-(Speed - (Speed * Curve)));
+		}
+		if (Curve < 0) //turn left
+		{
+			LeftDriveJaguar->Set(Speed - (Speed * Curve));
+			RightDriveJaguar->Set(-Speed);
+		}
+	}
+	
+	void UpdateCamera()
+	{
+		
+	}
 };
 
 START_ROBOT_CLASS(RobotDemo);
