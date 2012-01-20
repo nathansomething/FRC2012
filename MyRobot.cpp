@@ -144,31 +144,10 @@ public:
 		}
 		
 			
-			//myRobot->ArcadeDrive(stick); // drive with arcade style (use right stick)
-			//Wait(0.005);				// wait for a motor update time
+			
 	}
 	
-	/*void AutonomousRobotDrive(float Magnitude, float Curve, float Time)
-	{
-		for(double i=0; i<Time; i = (i + (WATCHDOG_EXPIRATION - 0.01)))
-		{
-			Jaguar1->Set(Magnitude + (Curve * Magnitude));
-			Jaguar2->Set(-Magnitude - (Curve * Magnitude));
-			Wait(WATCHDOG_EXPIRATION - 0.01);
-			Saftey->Feed();
-		}
-		//execute drive code here
-	}*/
 	
-	/*void TeleopRobotDrive(void)
-	{
-		
-		}
-	}*/
-	//~RobotDrive()
-	//{
-		//delete stick;
-	//}
 };
 
 START_ROBOT_CLASS(RobotDemo);
