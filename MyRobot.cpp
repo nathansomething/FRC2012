@@ -89,19 +89,18 @@ public:
 	 */
 	void OperatorControl(void)
 	{
-		//HSLImage *Himage;
-		//Threshold targetThreshold(247, 255, 60, 140, 10, 50);
-		//BinaryImage *matchingPixels;
-		//vector<ParticleAnalysisReport> *pReport;
+		HSLImage *Himage;
+		Threshold targetThreshold(247, 255, 60, 140, 10, 50);
+		BinaryImage *matchingPixels;
+		vector<ParticleAnalysisReport> *pReport;
 		
 		//myRobot->SetSafetyEnabled(true);
 		Saftey->SetEnabled(false);
-		//AxisCamera &mycam = AxisCamera::GetInstance("10.15.10.11");
+		AxisCamera &mycam = AxisCamera::GetInstance("10.15.10.11");
 		
-		//Camera->AxisCamera("10.15.10.11");
-		//mycam.WriteResolution(AxisCamera::kResolution_640x480);
-		//mycam.WriteCompression(20);
-		//mycam.WriteBrightness(25);
+		mycam.WriteResolution(AxisCamera::kResolution_640x480);
+		mycam.WriteCompression(20);
+		mycam.WriteBrightness(25);
 		Wait(3.0);
          
 		dsLCD = DriverStationLCD::GetInstance();
@@ -113,44 +112,37 @@ public:
 		
 		while(IsOperatorControl())
 		{
-		X[1] = Stick1->GetX();
-		X[2] = Stick2->GetX();
-		Y[1] = Stick1->GetY();
-		Y[2] = Stick2->GetY();
-		Z[1] = Stick1->GetZ();
-		Z[2] = Stick2->GetZ();
-		
-		Jaguar1->Set(Y[1]);
-		Jaguar2->Set(Y[2]);
-		
-		Wait(0.005);
-		}
-		/*while (IsOperatorControl())
-		{
-			Wait(1.0);
-			if (mycam.IsFreshImage())
-			{
-				Himage = mycam.GetImage();
-				
-				matchingPixels = Himage->ThresholdHSL(targetThreshold);
-				pReport = matchingPixels->GetOrderedParticleAnalysisReports();
-				
-				for (unsigned int i = 0; i < pReport->size(); i++)
-				{
-					printf("Index: %d X Center: %d Y Center: %d \n", i, (*pReport)[i].center_mass_x, (*pReport)[i].center_mass_y);
-					
-				}
-				
-				delete Himage;
-				delete matchingPixels;
-				delete pReport;
-			}*/
+			X[1] = Stick1->GetX();
+			X[2] = Stick2->GetX();
+			Y[1] = Stick1->GetY();
+			Y[2] = Stick2->GetY();
+			Z[1] = Stick1->GetZ();
+			Z[2] = Stick2->GetZ();
 			
-			/*Y1 = Stick1->GetY();
-			Y2 = Stick2->GetY();
-			printf("%f, %f\n", Y1, Y2);
-			Jaguar1->Set(Y1);
-			Jaguar2->Set(Y2);*/
+			Jaguar1->Set(Y[1]);
+			Jaguar2->Set(Y[2]);
+			
+			Wait(0.005);
+			if (mycam.IsFreshImage())
+						{
+							Himage = mycam.GetImage();
+							
+							matchingPixels = Himage->ThresholdHSL(targetThreshold);
+							pReport = matchingPixels->GetOrderedParticleAnalysisReports();
+							
+							for (unsigned int i = 0; i < pReport->size(); i++)
+							{
+								printf("Index: %d X Center: %d Y Center: %d \n", i, (*pReport)[i].center_mass_x, (*pReport)[i].center_mass_y);
+								
+							}
+							
+							delete Himage;
+							delete matchingPixels;
+							delete pReport;
+						}
+			
+		}
+		
 			
 			//myRobot->ArcadeDrive(stick); // drive with arcade style (use right stick)
 			//Wait(0.005);				// wait for a motor update time
