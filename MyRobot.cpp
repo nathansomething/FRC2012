@@ -120,7 +120,6 @@ public:
 					for (unsigned int i = 0; i < pReport->size(); i++)
 					{
 						printf("Index: %d X Center: %d Y Center: %d \n", i, (*pReport)[i].center_mass_x, (*pReport)[i].center_mass_y);
-						
 					}
 					
 					delete Himage;
