@@ -7,57 +7,12 @@
 #include <string.h>
 #include <math.h>
 #include <nivision.h>
-#include <nimachinevision.h>
-#include <windows.h>
+#include <cstdio>
+#include "ImageProcessing.h"
 
 // If you call Machine Vision functions in your script, add NIMachineVision.c to the project.
 
-#define IVA_MAX_BUFFERS 10
-#define IVA_STORE_RESULT_NAMES
-
-#define VisionErrChk(Function) {if (!(Function)) {success = 0; goto Error;}}
-
-typedef enum IVA_ResultType_Enum {IVA_NUMERIC, IVA_BOOLEAN, IVA_STRING} IVA_ResultType;
-
-typedef union IVA_ResultValue_Struct    // A result in Vision Assistant can be of type double, BOOL or string.
-{
-    double numVal;
-    BOOL   boolVal;
-    char*  strVal;
-} IVA_ResultValue;
-
-typedef struct IVA_Result_Struct
-{
-#if defined (IVA_STORE_RESULT_NAMES)
-    char resultName[256];           // Result name
-#endif
-    IVA_ResultType  type;           // Result type
-    IVA_ResultValue resultVal;      // Result value
-} IVA_Result;
-
-typedef struct IVA_StepResultsStruct
-{
-#if defined (IVA_STORE_RESULT_NAMES)
-    char stepName[256];             // Step name
-#endif
-    int         numResults;         // number of results created by the step
-    IVA_Result* results;            // array of results
-} IVA_StepResults;
-
-typedef struct IVA_Data_Struct
-{
-    Image* buffers[IVA_MAX_BUFFERS];            // Vision Assistant Image Buffers
-    IVA_StepResults* stepResults;              // Array of step results
-    int numSteps;                               // Number of steps allocated in the stepResults array
-    CoordinateSystem *baseCoordinateSystems;    // Base Coordinate Systems
-    CoordinateSystem *MeasurementSystems;       // Measurement Coordinate Systems
-    int numCoordSys;                            // Number of coordinate systems
-} IVA_Data;
-
-
-
 static IVA_Data* IVA_InitData(int numSteps, int numCoordSys);
-static int IVA_DisposeData(IVA_Data* ivaData);
 static int IVA_DisposeStepResults(IVA_Data* ivaData, int stepIndex);
 static int IVA_CLRThreshold(Image* image, int min1, int max1, int min2, int max2, int min3, int max3, int colorMode);
 static int IVA_Particle(Image* image,
@@ -88,10 +43,9 @@ static int IVA_DetectRectangles(Image* image,
                                          ROI* roi,
                                          int stepIndex);
 
-int IVA_ProcessImage(Image *image)
+int IVA_ProcessImage(Image *image, IVA_Data* &ivaData)
 {
 	int success = 1;
-    IVA_Data *ivaData;
     int pPixelMeasurements[81] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,
         16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,35,36,
         37,38,39,41,42,43,45,46,48,49,50,51,53,54,55,56,58,59,60,61,
@@ -105,9 +59,9 @@ int IVA_ProcessImage(Image *image)
     float rangeMax[3] = {360,0,200};
 
     // Initializes internal data (buffers and array of points for caliper measurements)
-    VisionErrChk(ivaData = IVA_InitData(5, 0));
+    VisionErrChk(ivaData = IVA_InitData(6, 0));
 
-	VisionErrChk(IVA_CLRThreshold(image, 0, 14, 0, 255, 57, 236, IMAQ_HSL));
+	VisionErrChk(IVA_CLRThreshold(image, 231, 19, 45, 255, 90, 207, IMAQ_HSL));
 
 	VisionErrChk(IVA_Particle(image, TRUE, pPixelMeasurements, 81, 
 		pCalibratedMeasurements, 0, ivaData, 1));
@@ -129,7 +83,14 @@ int IVA_ProcessImage(Image *image)
     structElem.kernel = pKernel;
 
     // Filters particles based on their size.
-    VisionErrChk(imaqSizeFilter(image, image, TRUE, 1, 0, &structElem));
+    VisionErrChk(imaqSizeFilter(image, image, TRUE, 1, (SizeType)0, &structElem));
+
+    //-------------------------------------------------------------------//
+    //                  Advanced Morphology: Convex Hull                 //
+    //-------------------------------------------------------------------//
+
+    // Computes the convex envelope for each labeled particle in the source image.
+    VisionErrChk(imaqConvexHull(image, image, TRUE));
 
     // Creates a new, empty region of interest.
     VisionErrChk(roi = imaqCreateROI());
@@ -140,13 +101,10 @@ int IVA_ProcessImage(Image *image)
 
 	VisionErrChk(IVA_DetectRectangles(image, ivaData, 10, 400, 10, 300, 
 		IMAQ_NORMAL_IMAGE, 1, IMAQ_NORMAL, 10, 15, 15, 10, 5, rangeMin, 
-		rangeMax, 100, roi, 4));
+		rangeMax, 100, roi, 5));
 
     // Cleans up resources associated with the object
     imaqDispose(roi);
-
-    // Releases the memory allocated in the IVA_Data structure.
-    IVA_DisposeData(ivaData);
 
 Error:
 	return success;
@@ -195,7 +153,7 @@ static int IVA_CLRThreshold(Image* image, int min1, int max1, int min2, int max2
     plane3Range.maxValue = max3;
 
     // Thresholds the color image.
-    VisionErrChk(imaqColorThreshold(thresholdImage, image, 1, colorMode, &plane1Range, &plane2Range, &plane3Range));
+    VisionErrChk(imaqColorThreshold(thresholdImage, image, 1, (ColorMode)colorMode, &plane1Range, &plane2Range, &plane3Range));
 
     // Copies the threshold image in the souce image.
     VisionErrChk(imaqDuplicate(image, thresholdImage));
@@ -273,7 +231,7 @@ static int IVA_Particle(Image* image,
     // If the image is calibrated, we also need to log the calibrated position (x and y)
     ivaData->stepResults[stepIndex].numResults = (visionInfo & IMAQ_VISIONINFO_CALIBRATION ?
                                                   numParticles * 4 + 1 : numParticles * 2 + 1);
-    ivaData->stepResults[stepIndex].results = malloc (sizeof(IVA_Result) * ivaData->stepResults[stepIndex].numResults);
+    ivaData->stepResults[stepIndex].results = (IVA_Result*)malloc (sizeof(IVA_Result) * ivaData->stepResults[stepIndex].numResults);
     
     particleResults = ivaData->stepResults[stepIndex].results;
 
@@ -289,13 +247,13 @@ static int IVA_Particle(Image* image,
         // Computes the requested pixel measurements about the particle.
         for (j = 0 ; j < numPixelMeasurements ; j++)
         {
-            VisionErrChk(imaqMeasureParticle(image, i, FALSE, pPixelMeasurements[j], &pixelMeasurements[i*numPixelMeasurements + j]));
+            VisionErrChk(imaqMeasureParticle(image, i, FALSE, (MeasurementType)pPixelMeasurements[j], &pixelMeasurements[i*numPixelMeasurements + j]));
         }
 
         // Computes the requested calibrated measurements about the particle.
         for (j = 0 ; j < numCalibratedMeasurements ; j++)
         {
-            VisionErrChk(imaqMeasureParticle(image, i, TRUE, pCalibratedMeasurements[j], &calibratedMeasurements[i*numCalibratedMeasurements + j]));
+            VisionErrChk(imaqMeasureParticle(image, i, TRUE, (MeasurementType)pCalibratedMeasurements[j], &calibratedMeasurements[i*numCalibratedMeasurements + j]));
         }
         
         #if defined (IVA_STORE_RESULT_NAMES)
@@ -427,9 +385,9 @@ static int IVA_DetectRectangles(Image* image,
     //-------------------------------------------------------------------//
 
     // Fill in the Curve options.
-    curveOptions.extractionMode = extraction;
+    curveOptions.extractionMode = (ExtractionMode)extraction;
     curveOptions.threshold = curveThreshold;
-    curveOptions.filterSize = edgeFilterSize;
+    curveOptions.filterSize = (EdgeFilterSize)edgeFilterSize;
     curveOptions.minLength = curveMinLength;
     curveOptions.rowStepSize = curveRowStepSize;
     curveOptions.columnStepSize = curveColumnStepSize;
@@ -475,7 +433,7 @@ static int IVA_DetectRectangles(Image* image,
     numObjectResults = (visionInfo & IMAQ_VISIONINFO_CALIBRATION ? 22 : 12);
 
     ivaData->stepResults[stepIndex].numResults = numMatchesFound * numObjectResults + 1;
-    ivaData->stepResults[stepIndex].results = malloc (sizeof(IVA_Result) * ivaData->stepResults[stepIndex].numResults);
+    ivaData->stepResults[stepIndex].results = (IVA_Result*)malloc (sizeof(IVA_Result) * ivaData->stepResults[stepIndex].numResults);
     shapeMacthingResults = ivaData->stepResults[stepIndex].results;
     
     if (shapeMacthingResults)
@@ -709,7 +667,7 @@ static IVA_Data* IVA_InitData(int numSteps, int numCoordSys)
     for (i = 0 ; i < numSteps ; i++)
     {
         #if defined (IVA_STORE_RESULT_NAMES)
-            sprintf(ivaData->stepResults[i].stepName, "");
+            sprintf(ivaData->stepResults[i].stepName, " ");
         #endif
         ivaData->stepResults[i].numResults = 0;
         ivaData->stepResults[i].results = NULL;
@@ -742,7 +700,7 @@ Error:
 // Return Value : success
 //
 ////////////////////////////////////////////////////////////////////////////////
-static int IVA_DisposeData(IVA_Data* ivaData)
+int IVA_DisposeData(IVA_Data* ivaData)
 {
     int i;
 
